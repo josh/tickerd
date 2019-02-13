@@ -1,8 +1,7 @@
-FROM golang:1.11.5-alpine AS builder
+FROM golang:1.11.5-alpine
 
 RUN apk add --no-cache \
     bash \
-    ca-certificates \
     gcc \
     git \
     libc-dev
@@ -16,18 +15,7 @@ RUN go mod download
 COPY . .
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build \
   -ldflags '-extldflags "-static"' \
-  -o /go/bin/tickerd
+  -o /usr/bin/tickerd
 
-
-FROM alpine
-
-RUN apk add --no-cache bash
-
-COPY --from=builder /go/bin/tickerd /usr/bin/tickerd
-
-CMD ["echo", "Hello, World!"]
-ENTRYPOINT ["/usr/bin/tickerd"]
-
-ENV TICKERD_HEALTHCHECK_FILE "/healthcheck"
-HEALTHCHECK --interval=30s --timeout=3s --start-period=3s --retries=1 \
-  CMD ["/usr/bin/tickerd", "-healthcheck"]
+CMD [ "--help" ]
+ENTRYPOINT [ "/usr/bin/tickerd" ]

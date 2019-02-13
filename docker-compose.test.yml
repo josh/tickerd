@@ -3,3 +3,4 @@ services:
   sut:
     build:
       context: .
+    command: echo "Hello, World!"
