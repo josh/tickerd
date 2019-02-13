@@ -82,17 +82,20 @@ func main() {
 		usage()
 	}
 
+	// run for first time
+	run(args)
+
+	// exit if only running once
+	if interval.Seconds() == 0 {
+		os.Exit(0)
+	}
+
 	sigTerm := make(chan os.Signal, 1)
 	signal.Notify(sigTerm, syscall.SIGTERM)
 
 	sigRun := make(chan os.Signal, 1)
 	signal.Notify(sigRun, syscall.SIGUSR1)
 
-	// run once if no interval given
-	if interval.Seconds() == 0 {
-		run(args)
-		os.Exit(0)
-	}
 	ticker := time.NewTicker(interval)
 
 	// enable fsnotify on watch path
