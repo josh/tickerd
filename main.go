@@ -16,7 +16,7 @@ import (
 
 var (
 	name      = "tickerd"
-	envPrefix = "GO"
+	envPrefix = "TICKERD"
 )
 
 var (
