@@ -22,6 +22,7 @@ var (
 var (
 	fs              *flag.FlagSet
 	intervalStr     string
+	timeoutStr      string
 	watchPath       string
 	healthcheckFile string
 	healthcheck     bool
@@ -41,6 +42,7 @@ func usage(message ...string) {
 func main() {
 	fs = flag.NewFlagSetWithEnvPrefix(name, envPrefix, flag.ExitOnError)
 	fs.StringVar(&intervalStr, "interval", "", "scheduling interval")
+	fs.StringVar(&timeoutStr, "timeout", "", "command timeout")
 	fs.StringVar(&watchPath, "watch", "", "watch path")
 	fs.StringVar(&healthcheckFile, "healthcheck-file", "", "healthcheck file")
 	fs.BoolVar(&healthcheck, "healthcheck", false, "run healthcheck")
@@ -50,6 +52,15 @@ func main() {
 	if intervalStr != "" {
 		var err error
 		interval, err = time.ParseDuration(intervalStr)
+		if err != nil {
+			usage(err.Error())
+		}
+	}
+
+	var timeout = time.Duration(0)
+	if timeoutStr != "" {
+		var err error
+		timeout, err = time.ParseDuration(timeoutStr)
 		if err != nil {
 			usage(err.Error())
 		}
@@ -83,7 +94,7 @@ func main() {
 	}
 
 	// run for first time
-	run(args)
+	run(args, timeout)
 
 	// exit if only running once
 	if interval.Seconds() == 0 {
@@ -112,16 +123,16 @@ func main() {
 		case <-sigTerm:
 			os.Exit(1)
 		case <-watchChan:
-			run(args)
+			run(args, timeout)
 		case <-sigRun:
-			run(args)
+			run(args, timeout)
 		case <-ticker.C:
-			run(args)
+			run(args, timeout)
 		}
 	}
 }
 
-func run(args []string) {
+func run(args []string, timeout time.Duration) {
 	cmd := exec.Command(args[0], args[1:]...)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
@@ -130,7 +141,19 @@ func run(args []string) {
 	fmt.Println("#", time.Now().Format(time.ANSIC))
 	fmt.Println("+", strings.Join(args, " "))
 
+	var timeoutTimer *time.Timer
+	if timeout.Seconds() != 0 {
+		timeoutTimer = time.AfterFunc(timeout, func() {
+			cmd.Process.Kill()
+		})
+	}
+
 	err := cmd.Run()
+
+	if timeoutTimer != nil {
+		timeoutTimer.Stop()
+	}
+
 	if err != nil {
 		fmt.Println(err)
 	}
