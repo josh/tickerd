@@ -15,7 +15,7 @@ FROM alpine:latest
 
 RUN apk add --no-cache bash
 
-RUN wget -O /usr/bin/tickerd https://github.com/josh/tickerd/releases/download/v0.1.0/tickerd-linux-amd64 && chmod +x /usr/bin/tickerd
+RUN wget -O /usr/bin/tickerd https://github.com/josh/tickerd/releases/latest/download/tickerd-linux-amd64 && chmod +x /usr/bin/tickerd
 
 CMD ["echo", "Hello, World!"]
 ENTRYPOINT ["/usr/bin/tickerd"]
