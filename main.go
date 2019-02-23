@@ -136,6 +136,7 @@ func run(args []string, timeout time.Duration) {
 	cmd := exec.Command(args[0], args[1:]...)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 
 	fmt.Println()
 	fmt.Println("#", time.Now().Format(time.ANSIC))
@@ -144,11 +145,14 @@ func run(args []string, timeout time.Duration) {
 	var timeoutTimer *time.Timer
 	if timeout.Seconds() != 0 {
 		timeoutTimer = time.AfterFunc(timeout, func() {
-			cmd.Process.Kill()
+			syscall.Kill(cmd.Process.Pid, syscall.SIGTERM)
+			<-time.NewTimer(30 * time.Second).C
+			syscall.Kill(cmd.Process.Pid, syscall.SIGKILL)
 		})
 	}
 
 	err := cmd.Run()
+	defer killProcessGroup(cmd.Process.Pid)
 
 	if timeoutTimer != nil {
 		timeoutTimer.Stop()
@@ -164,6 +168,37 @@ func run(args []string, timeout time.Duration) {
 			ioutil.WriteFile(healthcheckFile, data, 0644)
 		} else {
 			os.Remove(healthcheckFile)
+		}
+	}
+}
+
+func killProcessGroup(pgid int) {
+	termTimeout := time.NewTimer(5 * time.Second)
+	killTimeout := time.NewTimer(30 * time.Second)
+
+	noChildren := make(chan bool, 1)
+	go waitProcessGroup(pgid, noChildren)
+
+	for {
+		select {
+		case <-noChildren:
+			return
+		case <-termTimeout.C:
+			syscall.Kill(-pgid, syscall.SIGTERM)
+		case <-killTimeout.C:
+			syscall.Kill(-pgid, syscall.SIGKILL)
+		}
+	}
+}
+
+func waitProcessGroup(pgid int, done chan<- bool) {
+	for {
+		var wstatus syscall.WaitStatus
+		_, err := syscall.Wait4(-pgid, &wstatus, 0, nil)
+
+		if syscall.ECHILD == err {
+			done <- true
+			break
 		}
 	}
 }
