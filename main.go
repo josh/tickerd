@@ -14,7 +14,7 @@ import (
 	"github.com/namsral/flag"
 )
 
-var (
+const (
 	name      = "tickerd"
 	envPrefix = "TICKERD"
 )
