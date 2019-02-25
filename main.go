@@ -17,6 +17,7 @@ import (
 const (
 	name      = "tickerd"
 	envPrefix = "TICKERD"
+	version   = "0.3.0"
 )
 
 var (
@@ -26,6 +27,7 @@ var (
 	watchPath       string
 	healthcheckFile string
 	healthcheck     bool
+	printVersion    bool
 )
 
 func usage(message ...string) {
@@ -46,7 +48,13 @@ func main() {
 	fs.StringVar(&watchPath, "watch", "", "watch path")
 	fs.StringVar(&healthcheckFile, "healthcheck-file", "", "healthcheck file")
 	fs.BoolVar(&healthcheck, "healthcheck", false, "run healthcheck")
+	fs.BoolVar(&printVersion, "version", false, "print version")
 	fs.Parse(os.Args[1:])
+
+	if printVersion {
+		fmt.Println(version)
+		os.Exit(0)
+	}
 
 	var interval = time.Duration(0)
 	if intervalStr != "" {
