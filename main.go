@@ -107,14 +107,14 @@ func main() {
 	// enable fsnotify on watch path
 	var err error
 	var watcher *fsnotify.Watcher
-	watchChan := make(chan bool)	
+	watchChan := make(chan bool)
 	if watchPath != "" {
 		watcher, err = watch(watchChan, watchPath)
 		if err != nil {
 			usage(err.Error())
 		}
 	}
-	
+
 	var ticker *time.Ticker
 	var tickerChan <-chan time.Time
 
