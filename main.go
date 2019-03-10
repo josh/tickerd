@@ -17,7 +17,7 @@ import (
 const (
 	name      = "tickerd"
 	envPrefix = "TICKERD"
-	version   = "0.4.0"
+	version   = "0.5.0"
 )
 
 var (
