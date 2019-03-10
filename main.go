@@ -227,14 +227,8 @@ func watch(ch chan<- bool, name string) (*fsnotify.Watcher, error) {
 
 	go func() {
 		for {
-			select {
-			case event, ok := <-watcher.Events:
-				if !ok {
-					return
-				}
-				fmt.Println("debug watch/event", event)
-				ch <- true
-			}
+			<-watcher.Events
+			ch <- true
 		}
 	}()
 
