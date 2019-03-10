@@ -104,8 +104,26 @@ func main() {
 	// run for first time
 	run(args, timeout)
 
-	// exit if only running once
-	if interval.Seconds() == 0 {
+	// enable fsnotify on watch path
+	var err error
+	var watcher *fsnotify.Watcher
+	watchChan := make(chan bool)	
+	if watchPath != "" {
+		watcher, err = watch(watchChan, watchPath)
+		if err != nil {
+			usage(err.Error())
+		}
+	}
+	
+	var ticker *time.Ticker
+	var tickerChan <-chan time.Time
+
+	if interval.Seconds() != 0 {
+		// create real ticker chan if '-interval' defined
+		ticker = time.NewTicker(interval)
+		tickerChan = ticker.C
+	} else if watcher == nil {
+		// exit if only running once and no watcher set
 		os.Exit(0)
 	}
 
@@ -115,26 +133,16 @@ func main() {
 	sigRun := make(chan os.Signal, 1)
 	signal.Notify(sigRun, syscall.SIGUSR1)
 
-	ticker := time.NewTicker(interval)
-
-	// enable fsnotify on watch path
-	watchChan := make(chan bool)
-	if watchPath != "" {
-		err := watch(watchChan, watchPath)
-		if err != nil {
-			usage(err.Error())
-		}
-	}
-
 	for {
 		select {
 		case <-sigTerm:
+			watcher.Close()
 			os.Exit(1)
 		case <-watchChan:
 			run(args, timeout)
 		case <-sigRun:
 			run(args, timeout)
-		case <-ticker.C:
+		case <-tickerChan:
 			run(args, timeout)
 		}
 	}
@@ -211,12 +219,11 @@ func waitProcessGroup(pgid int, done chan<- bool) {
 	}
 }
 
-func watch(ch chan<- bool, name string) error {
+func watch(ch chan<- bool, name string) (*fsnotify.Watcher, error) {
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
-		return err
+		return nil, err
 	}
-	defer watcher.Close()
 
 	go func() {
 		for {
@@ -225,7 +232,6 @@ func watch(ch chan<- bool, name string) error {
 				if !ok {
 					return
 				}
-				// TODO: watcher event not working
 				fmt.Println("debug watch/event", event)
 				ch <- true
 			}
@@ -234,8 +240,8 @@ func watch(ch chan<- bool, name string) error {
 
 	err = watcher.Add(name)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	return nil
+	return watcher, nil
 }
