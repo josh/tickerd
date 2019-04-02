@@ -113,6 +113,7 @@ func main() {
 		if err != nil {
 			usage(err.Error())
 		}
+		defer watcher.Close()
 	}
 
 	var ticker *time.Ticker
@@ -129,6 +130,7 @@ func main() {
 
 	sigTerm := make(chan os.Signal, 1)
 	signal.Notify(sigTerm, syscall.SIGTERM)
+	signal.Notify(sigTerm, syscall.SIGINT)
 
 	sigRun := make(chan os.Signal, 1)
 	signal.Notify(sigRun, syscall.SIGUSR1)
@@ -136,8 +138,7 @@ func main() {
 	for {
 		select {
 		case <-sigTerm:
-			watcher.Close()
-			os.Exit(1)
+			goto Exit
 		case <-watchChan:
 			run(args, timeout)
 		case <-sigRun:
@@ -146,6 +147,8 @@ func main() {
 			run(args, timeout)
 		}
 	}
+
+Exit:
 }
 
 func run(args []string, timeout time.Duration) {
