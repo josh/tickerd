@@ -113,6 +113,7 @@ func main() {
 		if err != nil {
 			usage(err.Error())
 		}
+		defer watcher.Close()
 	}
 
 	var ticker *time.Ticker
@@ -136,7 +137,6 @@ func main() {
 	for {
 		select {
 		case <-sigTerm:
-			watcher.Close()
 			os.Exit(1)
 		case <-watchChan:
 			run(args, timeout)
