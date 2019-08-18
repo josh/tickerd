@@ -12,5 +12,5 @@ jobs:
     - name: build
       run: docker-compose -f docker-compose.test.yml build
 
-    - name: sut
-      run: docker-compose -f docker-compose.test.yml sut
+    - name: test
+      run: docker-compose -f docker-compose.test.yml run sut
