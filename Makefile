@@ -9,4 +9,4 @@ release: build
 	docker cp tickerd-build:/usr/bin/tickerd ./tickerd-linux-amd64
 	docker rm tickerd-build
 
-.PHONY: build test
+.PHONY: build test release
