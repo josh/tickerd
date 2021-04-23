@@ -12,6 +12,7 @@ import (
 
 	"github.com/fsnotify/fsnotify"
 	"github.com/namsral/flag"
+	"github.com/robfig/cron"
 )
 
 const (
@@ -22,7 +23,9 @@ const (
 
 var (
 	fs              *flag.FlagSet
+	skipInitial     bool
 	intervalStr     string
+	cronStr         string
 	timeoutStr      string
 	watchPath       string
 	healthcheckFile string
@@ -43,7 +46,9 @@ func usage(message ...string) {
 
 func main() {
 	fs = flag.NewFlagSetWithEnvPrefix(name, envPrefix, flag.ExitOnError)
+	fs.BoolVar(&skipInitial, "skip-initial", false, "skip initial run")
 	fs.StringVar(&intervalStr, "interval", "", "scheduling interval")
+	fs.StringVar(&cronStr, "cron", "", "cron schedule")
 	fs.StringVar(&timeoutStr, "timeout", "", "command timeout")
 	fs.StringVar(&watchPath, "watch", "", "watch path")
 	fs.StringVar(&healthcheckFile, "healthcheck-file", "", "healthcheck file")
@@ -63,6 +68,16 @@ func main() {
 		if err != nil {
 			usage(err.Error())
 		}
+	}
+
+	var cronSchedule cron.Schedule
+	if cronStr != "" {
+		var err error
+		cronSchedule, err = cron.Parse(cronStr)
+		if err != nil {
+			usage(err.Error())
+		}
+		skipInitial = true
 	}
 
 	var timeout = time.Duration(0)
@@ -101,8 +116,10 @@ func main() {
 		usage()
 	}
 
-	// run for first time
-	run(args, timeout)
+	// initial run
+	if skipInitial == false {
+		run(args, timeout)
+	}
 
 	// enable fsnotify on watch path
 	var err error
@@ -116,15 +133,24 @@ func main() {
 		defer watcher.Close()
 	}
 
+	cronChan := make(chan bool)
+	if cronSchedule != nil {
+		c := cron.New()
+		job := cron.FuncJob(func() { cronChan <- true })
+		c.Schedule(cronSchedule, job)
+		c.Start()
+	}
+
 	var ticker *time.Ticker
 	var tickerChan <-chan time.Time
-
 	if interval.Seconds() != 0 {
 		// create real ticker chan if '-interval' defined
 		ticker = time.NewTicker(interval)
 		tickerChan = ticker.C
-	} else if watcher == nil {
-		// exit if only running once and no watcher set
+	}
+
+	if ticker == nil && cronSchedule == nil && watcher == nil {
+		// exit if only running once
 		os.Exit(0)
 	}
 
@@ -138,11 +164,13 @@ func main() {
 		select {
 		case <-sigTerm:
 			os.Exit(1)
-		case <-watchChan:
-			run(args, timeout)
 		case <-sigRun:
 			run(args, timeout)
 		case <-tickerChan:
+			run(args, timeout)
+		case <-cronChan:
+			run(args, timeout)
+		case <-watchChan:
 			run(args, timeout)
 		}
 	}
