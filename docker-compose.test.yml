@@ -1,6 +1,0 @@
-version: "3"
-services:
-  sut:
-    build:
-      context: .
-    command: echo "Hello, World!"
