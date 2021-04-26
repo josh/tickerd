@@ -1,4 +1,4 @@
-FROM golang:1.15.6-alpine
+FROM golang:1.15.6-alpine AS builder
 
 RUN apk add --no-cache \
     bash \
@@ -17,5 +17,9 @@ RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build \
   -ldflags '-extldflags "-static"' \
   -o /usr/bin/tickerd
 
+
+FROM scratch
+COPY --from=builder /usr/bin/tickerd /tickerd
+
 CMD [ "--help" ]
-ENTRYPOINT [ "/usr/bin/tickerd" ]
+ENTRYPOINT [ "/tickerd" ]
