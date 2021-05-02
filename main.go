@@ -103,7 +103,6 @@ func main() {
 		} else {
 			os.Exit(1)
 		}
-
 	}
 
 	// handle "--"
