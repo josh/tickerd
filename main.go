@@ -12,7 +12,7 @@ import (
 
 	"github.com/fsnotify/fsnotify"
 	"github.com/namsral/flag"
-	"github.com/robfig/cron"
+	"github.com/robfig/cron/v3"
 )
 
 const (
@@ -73,7 +73,8 @@ func main() {
 	var cronSchedule cron.Schedule
 	if cronStr != "" {
 		var err error
-		cronSchedule, err = cron.Parse(cronStr)
+		parser := cron.NewParser(cron.Minute | cron.Hour | cron.Dom | cron.Month | cron.Dow | cron.Descriptor)
+		cronSchedule, err = parser.Parse(cronStr)
 		if err != nil {
 			usage(err.Error())
 		}
