@@ -2,10 +2,12 @@ package main
 
 import (
 	"fmt"
-	"io/ioutil"
+	"log"
+	"net"
 	"os"
 	"os/exec"
 	"os/signal"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -22,16 +24,19 @@ const (
 )
 
 var (
-	fs              *flag.FlagSet
-	skipInitial     bool
-	intervalStr     string
-	cronStr         string
-	timeoutStr      string
-	watchPath       string
-	healthcheckFile string
-	healthcheck     bool
-	printVersion    bool
+	fs                 *flag.FlagSet
+	skipInitial        bool
+	intervalStr        string
+	cronStr            string
+	timeoutStr         string
+	watchPath          string
+	healthcheckPort    int
+	healthcheckAddress string
+	healthcheck        bool
+	printVersion       bool
 )
+
+var runErr error
 
 func usage(message ...string) {
 	if len(message) == 0 {
@@ -51,7 +56,7 @@ func main() {
 	fs.StringVar(&cronStr, "cron", "", "cron schedule")
 	fs.StringVar(&timeoutStr, "timeout", "", "command timeout")
 	fs.StringVar(&watchPath, "watch", "", "watch path")
-	fs.StringVar(&healthcheckFile, "healthcheck-file", "", "healthcheck file")
+	fs.IntVar(&healthcheckPort, "healthcheck-port", 0, "healthcheck port")
 	fs.BoolVar(&healthcheck, "healthcheck", false, "run healthcheck")
 	fs.BoolVar(&printVersion, "version", false, "print version")
 	fs.Parse(os.Args[1:])
@@ -90,19 +95,25 @@ func main() {
 		}
 	}
 
-	// -healthcheck requires -healthcheck-file
-	if healthcheck && healthcheckFile == "" {
-		usage()
+	if healthcheckPort != 0 {
+		healthcheckAddress = ":" + strconv.Itoa(healthcheckPort)
 	}
 
 	// run docker healthcheck
 	if healthcheck {
-		_, err := os.Stat(healthcheckFile)
-		if os.IsNotExist(err) {
-			os.Exit(0)
-		} else {
-			os.Exit(1)
+		conn, err := net.Dial("tcp", healthcheckAddress)
+		if err != nil {
+			log.Fatal(err)
 		}
+		buf := make([]byte, 1)
+		buf[0] = 1
+		conn.Read(buf)
+		os.Exit(int(buf[0]))
+	}
+
+	// start healthcheck server
+	if healthcheckAddress != "" {
+		go healthcheckListen()
 	}
 
 	// handle "--"
@@ -195,24 +206,15 @@ func run(args []string, timeout time.Duration) {
 		})
 	}
 
-	err := cmd.Run()
+	runErr = cmd.Run()
 	defer killProcessGroup(cmd.Process.Pid)
 
 	if timeoutTimer != nil {
 		timeoutTimer.Stop()
 	}
 
-	if err != nil {
-		fmt.Println(err)
-	}
-
-	if healthcheckFile != "" {
-		if err != nil {
-			data := []byte(err.Error())
-			ioutil.WriteFile(healthcheckFile, data, 0644)
-		} else {
-			os.Remove(healthcheckFile)
-		}
+	if runErr != nil {
+		fmt.Println(runErr)
 	}
 }
 
@@ -266,4 +268,25 @@ func watch(ch chan<- bool, name string) (*fsnotify.Watcher, error) {
 	}
 
 	return watcher, nil
+}
+
+func healthcheckListen() {
+	listener, err := net.Listen("tcp", healthcheckAddress)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer listener.Close()
+
+	for {
+		conn, err := listener.Accept()
+		if err != nil {
+			continue
+		}
+		if runErr == nil {
+			conn.Write([]byte{0})
+		} else {
+			conn.Write([]byte{1})
+		}
+		conn.Close()
+	}
 }

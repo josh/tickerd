@@ -20,7 +20,7 @@ RUN wget -O /usr/bin/tickerd https://github.com/josh/tickerd/releases/latest/dow
 CMD ["echo", "Hello, World!"]
 ENTRYPOINT ["/usr/bin/tickerd"]
 
-ENV TICKERD_HEALTHCHECK_FILE "/var/log/healthcheck"
+ENV TICKERD_HEALTHCHECK_PORT 9000
 HEALTHCHECK --interval=30s --timeout=3s --start-period=3s --retries=1 \
   CMD ["/usr/bin/tickerd", "-healthcheck"]
 ```
