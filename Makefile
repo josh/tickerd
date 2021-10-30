@@ -4,9 +4,14 @@ build:
 test: build
 	docker run --name tickerd --rm -it tickerd
 
-release: build
-	docker create -it --name tickerd-build tickerd echo
-	docker cp tickerd-build:/tickerd ./tickerd-linux-amd64
-	docker rm tickerd-build
+dist/tickerd-linux-amd64:
+	docker build --output - . | tar -x tickerd
+	mkdir -p dist/
+	mv tickerd "$@"
 
-.PHONY: build test release
+release: dist/tickerd-linux-amd64
+
+clean:
+	rm -rf dist/
+
+.PHONY: build test release clean
