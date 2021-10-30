@@ -4,12 +4,14 @@ build:
 test: build
 	docker run --name tickerd --rm -it tickerd
 
-dist/tickerd-linux-amd64:
-	docker build --output - . | tar -x tickerd
+dist/tickerd-linux-%:
+	docker build --build-arg GOARCH=$* --output - . | tar -x tickerd
 	mkdir -p dist/
 	mv tickerd "$@"
 
-release: dist/tickerd-linux-amd64
+release: \
+	dist/tickerd-linux-amd64 \
+	dist/tickerd-linux-arm64
 
 clean:
 	rm -rf dist/
